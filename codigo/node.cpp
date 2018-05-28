@@ -321,6 +321,9 @@ int node() {
         }
     }
 
+    delete new_block;
     delete last_block_in_chain;
+    delete[] blocks_to_send;
+
     return 0;
 }
