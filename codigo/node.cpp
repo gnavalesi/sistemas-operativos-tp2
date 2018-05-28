@@ -281,12 +281,11 @@ int node() {
         exit(-1);
     }
 
-    while (true) {
+    while (!finished_mining.load()) {
         //FIXME: Recibir mensajes de otros nodos
 
         receive_mutex.lock();
         receive_mutex.unlock();
-        if(finished_mining) break;
 
         run(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &message_status), "Error: unable to probe message");
 
