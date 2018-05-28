@@ -179,15 +179,16 @@ void broadcast_block(const Block *block) {
     //No enviar a mí mismo
     //FIXME: Completar
 
-    int i;
-    for (i = mpi_rank + 1; i < total_nodes; i++) {
-        run(MPI_Send(block, 1, *MPI_BLOCK, i, TAG_NEW_BLOCK, MPI_COMM_WORLD),
+    int r = mpi_rank, i = 0;
+    MPI_Request requests[total_nodes-1];
+
+    while ((r = (r+1) % total_nodes) != mpi_rank) {
+        run(MPI_Isend(block, 1, *MPI_BLOCK, r, TAG_NEW_BLOCK, MPI_COMM_WORLD, &requests[i++]),
             "Error: unable to send TAG_NEW_BLOCK message");
     }
-    for (i = 0; i < mpi_rank; i++) {
-        run(MPI_Send(block, 1, *MPI_BLOCK, i, TAG_NEW_BLOCK, MPI_COMM_WORLD),
-            "Error: unable to send TAG_NEW_BLOCK message");
-    }
+
+    run(MPI_Waitall(total_nodes-1, requests, MPI_STATUSES_IGNORE),
+        "Error: unable to wait for TAG_NEW_BLOCK message completion");
 }
 
 //Proof of work
