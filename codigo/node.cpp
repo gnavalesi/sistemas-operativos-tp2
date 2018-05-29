@@ -284,39 +284,37 @@ int node() {
     while (!finished_mining.load()) {
         //FIXME: Recibir mensajes de otros nodos
 
-        receive_mutex.lock();
-        receive_mutex.unlock();
-
-        run(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &message_status), "Error: unable to probe message");
+        run(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &message_status),
+            "Error: unable to probe message");
 
         if (message_status.MPI_TAG == TAG_NEW_BLOCK) {
             //FIXME: Si es un mensaje de nuevo bloque, llamar a la función
             // validate_block_for_chain con el bloque recibido y el estado de MPI
 
-            run(MPI_Recv(new_block, 1, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_NEW_BLOCK, MPI_COMM_WORLD,
-                         &message_status), "Error: unable to receive TAG_NEW_BLOCK message");
+            run(MPI_Recv(new_block, 1, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_NEW_BLOCK,
+                MPI_COMM_WORLD, &message_status), "Error: unable to receive TAG_NEW_BLOCK message");
 
+            receive_mutex.lock();
             validate_block_for_chain(new_block, &message_status);
+            receive_mutex.unlock();
+
         } else if (message_status.MPI_TAG == TAG_CHAIN_HASH) {
             //FIXME: Si es un mensaje de pedido de cadena,
             //responderlo enviando los bloques correspondientes
 
-            run(MPI_Recv(block_hash, HASH_SIZE, MPI_CHAR, message_status.MPI_SOURCE, TAG_CHAIN_HASH, MPI_COMM_WORLD,
-                         &message_status), "Error: unable to receive TAG_CHAIN_HASH message");
+            run(MPI_Recv(block_hash, HASH_SIZE, MPI_CHAR, message_status.MPI_SOURCE, TAG_CHAIN_HASH,
+                MPI_COMM_WORLD, &message_status), "Error: unable to receive TAG_CHAIN_HASH message");
 
-            // Asumo que tengo ese nodo registrado
-            bool last_found = false;
             string hash = string(block_hash);
-            for (i = 0; i < VALIDATION_BLOCKS; i++) {
-                if (!last_found) {
-                    blocks_to_send[i] = node_blocks.at(hash);
-                    last_found = blocks_to_send[i].index == 1;
-                    if (!last_found) hash = string(blocks_to_send[i].block_hash);
-                }
+            i = 0;
+            do {
+                blocks_to_send[i] = node_blocks.at(hash);
+                hash = string(blocks_to_send[i].block_hash);
             }
+            while (blocks_to_send[i].index != 1 && ++i < VALIDATION_BLOCKS);
 
-            run(MPI_Send(blocks_to_send, VALIDATION_BLOCKS, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_CHAIN_RESPONSE,
-                         MPI_COMM_WORLD), "Error: unable to send TAG_CHAIN_RESPONSE message");
+            run(MPI_Send(blocks_to_send, VALIDATION_BLOCKS, *MPI_BLOCK, message_status.MPI_SOURCE,
+                TAG_CHAIN_RESPONSE, MPI_COMM_WORLD), "Error: unable to send TAG_CHAIN_RESPONSE message");
         }
     }
 
