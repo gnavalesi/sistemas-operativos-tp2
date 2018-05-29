@@ -100,7 +100,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
 
         //Agrego el bloque al diccionario, aunque no
         //necesariamente eso lo agrega a la cadena
-        Block *new_block = &(node_blocks[string(rBlock->block_hash)] = *rBlock);
+        node_blocks[string(rBlock->block_hash)] = *rBlock;
 
         // Lockeo last_block_in_chain porque lo voy a consultar y posiblemente modificar
         last_block_mutex.lock();
@@ -108,53 +108,53 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
         //FIXME: Si el índice del bloque recibido es 1
         //y mí último bloque actual tiene índice 0,
         //entonces lo agrego como nuevo último.
-        if (new_block->index == 1 && last_block_in_chain->index == 0) {
-            *last_block_in_chain = *new_block;
+        if (rBlock->index == 1 && last_block_in_chain->index == 0) {
+            *last_block_in_chain = *rBlock;
             ret = true;
             printf("[%d] Agregado a la lista bloque con index %d enviado por %d \n", mpi_rank,
-                   new_block->index, status->MPI_SOURCE);
+                   rBlock->index, status->MPI_SOURCE);
         }
 
         //FIXME: Si el índice del bloque recibido es
         //el siguiente a mí último bloque actual...
-        else if (last_block_in_chain->index + 1 == new_block->index) {
+        else if (last_block_in_chain->index + 1 == rBlock->index) {
             //...y el bloque anterior apuntado por el recibido es mí último actual,
             //entonces lo agrego como nuevo último.
-            if (string(new_block->previous_block_hash) == string(last_block_in_chain->block_hash)) {
-                *last_block_in_chain = *new_block;
+            if (string(rBlock->previous_block_hash) == string(last_block_in_chain->block_hash)) {
+                *last_block_in_chain = *rBlock;
                 ret = true;
                 printf("[%d] Agregado a la lista bloque con index %d enviado por %d \n", mpi_rank,
-                       new_block->index, status->MPI_SOURCE);
+                       rBlock->index, status->MPI_SOURCE);
             }
             //...pero el bloque anterior apuntado por el recibido no es mí último actual,
             //entonces hay una blockchain más larga que la mía.
             else {
-                ret = verificar_y_migrar_cadena(new_block, status);
-                printf("[%d] Perdí la carrera por uno (%d) contra %d \n", mpi_rank, new_block->index,
+                ret = verificar_y_migrar_cadena(rBlock, status);
+                printf("[%d] Perdí la carrera por uno (%d) contra %d \n", mpi_rank, rBlock->index,
                        status->MPI_SOURCE);
             }
         }
 
         //FIXME: Si el índice del bloque recibido es igua al índice de mi último bloque actual,
         //entonces hay dos posibles forks de la blockchain pero mantengo la mía
-        else if (new_block->index == last_block_in_chain->index) {
+        else if (rBlock->index == last_block_in_chain->index) {
             ret = false;
-            printf("[%d] Conflicto suave: Conflicto de branch (%d) contra %d \n", mpi_rank, new_block->index,
+            printf("[%d] Conflicto suave: Conflicto de branch (%d) contra %d \n", mpi_rank, rBlock->index,
                    status->MPI_SOURCE);
         }
 
         //FIXME: Si el índice del bloque recibido es anterior al índice de mi último bloque actual,
         //entonces lo descarto porque asumo que mi cadena es la que está quedando preservada.
-        else if (new_block->index < last_block_in_chain->index) {
+        else if (rBlock->index < last_block_in_chain->index) {
             ret = false;
-            printf("[%d] Conflicto suave: Descarto el bloque (%d vs %d) contra %d \n", mpi_rank, new_block->index,
+            printf("[%d] Conflicto suave: Descarto el bloque (%d vs %d) contra %d \n", mpi_rank, rBlock->index,
                    last_block_in_chain->index, status->MPI_SOURCE);
         }
 
         //FIXME: Si el índice del bloque recibido está más de una posición adelantada a mi último bloque actual,
         //entonces me conviene abandonar mi blockchain actual
-        else if (new_block->index > last_block_in_chain->index + 1) {
-            ret = verificar_y_migrar_cadena(new_block, status);
+        else if (rBlock->index > last_block_in_chain->index + 1) {
+            ret = verificar_y_migrar_cadena(rBlock, status);
             printf("[%d] Perdí la carrera por varios contra %d \n", mpi_rank, status->MPI_SOURCE);
         }
 
