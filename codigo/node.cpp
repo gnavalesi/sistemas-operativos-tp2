@@ -28,12 +28,10 @@ void run(int result, const string &message) {
 //Si nos separan más de VALIDATION_BLOCKS bloques de distancia entre las cadenas, se descarta por seguridad
 bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
 
+    Block *blockchain = new Block[VALIDATION_BLOCKS];
+    MPI_Status message_status{};
+
     //FIXME: Enviar mensaje TAG_CHAIN_HASH
-    auto *blockchain = new Block[VALIDATION_BLOCKS];
-    MPI_Status response_status{};
-    int i;
-
-
     printf("[%d] Pidiendo cadena a %d empezando por el hash %s\n", mpi_rank, status->MPI_SOURCE, rBlock->block_hash);
     run(MPI_Send(rBlock->block_hash, HASH_SIZE, MPI_CHAR, status->MPI_SOURCE, TAG_CHAIN_HASH, MPI_COMM_WORLD),
         "Error: unable to send TAG_CHAIN_HASH message");
@@ -41,54 +39,67 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
     //FIXME: Recibir mensaje TAG_CHAIN_RESPONSE
     printf("[%d] Recibiendo bloques de %d\n", mpi_rank, status->MPI_SOURCE);
     run(MPI_Recv(blockchain, VALIDATION_BLOCKS, *MPI_BLOCK, status->MPI_SOURCE, TAG_CHAIN_RESPONSE, MPI_COMM_WORLD,
-                 &response_status),
+                 &message_status),
         "Error: unable to receive TAG_CHAIN_RESPONSE message");
     printf("[%d] Bloques recibidos de %d\n", mpi_rank, status->MPI_SOURCE);
 
     //FIXME: Verificar que los bloques recibidos
     //sean válidos y se puedan acoplar a la cadena
 
+    bool valid = false, found = false;
+    int i;
+    int chain_count;
+    MPI_Get_count(&message_status, *MPI_BLOCK, &chain_count);
+
     if (string(blockchain[0].block_hash) == string(rBlock->block_hash) &&
         blockchain[0].index == rBlock->index) {
 
-        printf("[%d] Primer bloque enviado por %d es valido\n", mpi_rank, status->MPI_SOURCE);
+        string hash;
+        block_to_hash(&blockchain[0], hash);
 
-        if (blockchain[0].block_hash == block_to_str(&blockchain[0])) {
-            bool valid = true;
-            bool found = false;
+        if (string(blockchain[0].block_hash) == hash) {
+            printf("[%d] Primer bloque enviado por %d es valido\n", mpi_rank, status->MPI_SOURCE);
 
-            for (i = 0; i < VALIDATION_BLOCKS - 1; i++) {
-                if (blockchain[i].index > 1) {
-                    valid = valid && string(blockchain[i].previous_block_hash) == string(blockchain[i + 1].block_hash)
-                            && blockchain[i].index == blockchain[i + 1].index + 1;
-                    found = node_blocks.count(blockchain[i].block_hash) == 1;
-                } else {
-                    found = found || blockchain[i].index == 1;
+            i = 0; valid = true;
+            while (++i < chain_count) {
+                if (blockchain[i-1].index != blockchain[i].index + 1 ||
+                    string(blockchain[i-1].previous_block_hash) != string(blockchain[i].block_hash)) {
+                    valid = false;
                     break;
                 }
+
+                if (node_blocks.count(string(blockchain[i].block_hash)) == 1) break;
             }
 
-            if (valid && found) {
-                *last_block_in_chain = blockchain[0];
-                for (i = 0; i < VALIDATION_BLOCKS; i++) {
-                    if (node_blocks.count(blockchain[i].block_hash) == 0) {
-                        node_blocks[string(blockchain[i].block_hash)] = blockchain[i];
-
-                        if (blockchain[i].index == 1) {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-
-                delete[]blockchain;
-                return true;
+            if (valid) {
+                printf("[%d] La cadena de bloques enviada por %d es valida\n", mpi_rank, status->MPI_SOURCE);
+                found = i < chain_count;
             }
         }
     }
 
-    delete[]blockchain;
+
+    if (found) {
+        for (int j = 1; j < i; ++j) node_blocks[string(blockchain[i].block_hash)] = blockchain[i];
+        *last_block_in_chain = blockchain[0];
+
+        printf("[%d] Agregué la cadena de bloques enviada por %d\n", mpi_rank, status->MPI_SOURCE);
+
+        delete[] blockchain;
+        return true;
+    }
+
+    if (!valid)
+        printf("[%d] La cadena de bloques enviada por %d es invalida\n", mpi_rank, status->MPI_SOURCE);
+    else if (!found)
+        printf("[%d] No se encontró ningún bloque de la cadena enviada por %d en el diccionario\n", mpi_rank, status->MPI_SOURCE);
+    else
+        cerr << "Error: verificar_y_migrar_cadena" << endl;
+
+    printf("[%d] Terminado. No se puede migrar cadena.\n", mpi_rank);
+    finished_mining.store(false);
+
+    delete[] blockchain;
     return false;
 }
 
@@ -129,9 +140,9 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
             //...pero el bloque anterior apuntado por el recibido no es mí último actual,
             //entonces hay una blockchain más larga que la mía.
             else {
-                ret = verificar_y_migrar_cadena(rBlock, status);
                 printf("[%d] Perdí la carrera por uno (%d) contra %d \n", mpi_rank, rBlock->index,
                        status->MPI_SOURCE);
+                ret = verificar_y_migrar_cadena(rBlock, status);
             }
         }
 
@@ -154,8 +165,8 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
         //FIXME: Si el índice del bloque recibido está más de una posición adelantada a mi último bloque actual,
         //entonces me conviene abandonar mi blockchain actual
         else if (rBlock->index > last_block_in_chain->index + 1) {
-            ret = verificar_y_migrar_cadena(rBlock, status);
             printf("[%d] Perdí la carrera por varios contra %d \n", mpi_rank, status->MPI_SOURCE);
+            ret = verificar_y_migrar_cadena(rBlock, status);
         }
 
         last_block_mutex.unlock();
@@ -302,13 +313,20 @@ int node() {
             string hash = string(block_hash);
             i = 0;
             do {
-                blocks_to_send[i] = node_blocks.at(hash);
-                hash = string(blocks_to_send[i].block_hash);
+                auto it = node_blocks.find(hash);
+                if (it == node_blocks.end()) break;
+                blocks_to_send[i] = it->second;
+                hash = string(it->second.previous_block_hash);
             }
-            while (blocks_to_send[i].index != 1 && ++i < VALIDATION_BLOCKS);
+            while (blocks_to_send[i].index > 1 && ++i < VALIDATION_BLOCKS);
 
-            run(MPI_Send(blocks_to_send, VALIDATION_BLOCKS, *MPI_BLOCK, message_status.MPI_SOURCE,
-                TAG_CHAIN_RESPONSE, MPI_COMM_WORLD), "Error: unable to send TAG_CHAIN_RESPONSE message");
+            if (i == 0) {
+                printf("[%d] No tengo el bloque pedido por %d con hash %s\n",
+                       mpi_rank, message_status.MPI_SOURCE, block_hash);
+            }
+
+            run(MPI_Send(blocks_to_send, i, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_CHAIN_RESPONSE,
+                MPI_COMM_WORLD), "Error: unable to send TAG_CHAIN_RESPONSE message");
         }
     }
 
