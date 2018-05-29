@@ -97,7 +97,7 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
         cerr << "Error: verificar_y_migrar_cadena" << endl;
 
     printf("[%d] Terminado. No se puede migrar cadena.\n", mpi_rank);
-    finished_mining.store(false);
+    finished_mining.store(true);
 
     delete[] blockchain;
     return false;
@@ -202,7 +202,7 @@ void *proof_of_work(void *ptr) {
     string hash_hex_str;
     Block block;
     unsigned int mined_blocks = 0;
-    while (mined_blocks < BLOCKS_TO_MINE) {
+    while (mined_blocks < BLOCKS_TO_MINE && !finished_mining) {
 
         last_block_mutex.lock();
         block = *last_block_in_chain;
