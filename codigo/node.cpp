@@ -214,6 +214,7 @@ void *proof_of_work(void *ptr) {
         block.index += 1;
         block.node_owner_number = mpi_rank;
         block.difficulty = DEFAULT_DIFFICULTY;
+        block.created_at = static_cast<unsigned long int> (time(NULL));
         memcpy(block.previous_block_hash, block.block_hash, HASH_SIZE);
 
         //Agregar un nonce al azar al bloque para intentar resolver el problema
@@ -232,7 +233,6 @@ void *proof_of_work(void *ptr) {
                 mined_blocks += 1;
                 *last_block_in_chain = block;
                 strcpy(last_block_in_chain->block_hash, hash_hex_str.c_str());
-                last_block_in_chain->created_at = static_cast<unsigned long int> (time(NULL));
                 Block *new_block = &(node_blocks[hash_hex_str] = *last_block_in_chain);
 
                 last_block_mutex.unlock();
