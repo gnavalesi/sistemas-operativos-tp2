@@ -1,0 +1,9 @@
+\section{Ejercicio 1}
+
+\emph{Completar la función broadcast\_block para que comunique a todos los demás nodos el nuevo bloque creado con el tag \texttt{TAG\_NEW\_BLOCK}. Cada nodo debe enviar los mensajes en un orden distinto a los demás nodos.}
+
+Para que se envíen los mensajes en un orden distinto cada nodo hace el envío respetando el orden de los rangos, comenzando desde el nodo inmediatamente siguiente y ``dando la vuelta"\ para seguir con el de menor rango una vez que se llega al nodo de máximo rango. Es decir, el nodo de rango $i$ envía los mensajes en el orden de rangos $i+1 \mod N,\ i+2 \mod N,\ \dots,\ i+(N-1) \mod N$, donde $N$ es la cantidad de nodos.
+
+Los mensajes se envían de forma no bloqueante con \texttt{MPI\_Isend} para que la lectura del bloque se pueda hacer concurrentemente. Si se usara \texttt{MPI\_Send}, cada pedido de envío comenzaría recién una vez que el llamado anterior haya terminado de leer el bloque, forzando una lectura secuencial.
+
+Luego de hacer todos los pedidos de envío se espera a que los mismos finalicen con un llamado a \texttt{MPI\_Waitall}.
