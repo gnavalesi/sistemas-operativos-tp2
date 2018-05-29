@@ -184,6 +184,8 @@ void broadcast_block(const Block *block) {
     //No enviar a mí mismo
     //FIXME: Completar
 
+    printf("[%d] Enviando nuevo bloque minado con índice %d\n", mpi_rank, block->index);
+
     int r = mpi_rank, i = 0;
     MPI_Request requests[total_nodes-1];
 
@@ -323,6 +325,8 @@ int node() {
             if (i == 0) {
                 printf("[%d] No tengo el bloque pedido por %d con hash %s\n",
                        mpi_rank, message_status.MPI_SOURCE, block_hash);
+            } else {
+                printf("[%d] Enviando cadena de bloques a %d\n", mpi_rank, message_status.MPI_SOURCE);
             }
 
             run(MPI_Send(blocks_to_send, i, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_CHAIN_RESPONSE,
