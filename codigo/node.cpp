@@ -227,20 +227,25 @@ void *proof_of_work(void *ptr) {
 
             //Verifico que no haya cambiado mientras calculaba
             last_block_mutex.lock();
+
             if (last_block_in_chain->index < block.index) {
                 mined_blocks += 1;
                 *last_block_in_chain = block;
                 strcpy(last_block_in_chain->block_hash, hash_hex_str.c_str());
                 last_block_in_chain->created_at = static_cast<unsigned long int> (time(NULL));
-                node_blocks[hash_hex_str] = *last_block_in_chain;
+                Block *new_block = &(node_blocks[hash_hex_str] = *last_block_in_chain);
+
+                last_block_mutex.unlock();
                 printf("[%d] Agregué un bloque producido con index %d \n", mpi_rank, last_block_in_chain->index);
 
                 //FIXME: Mientras comunico, no responder mensajes de nuevos nodos
                 receive_mutex.lock();
-                broadcast_block(last_block_in_chain);
+                broadcast_block(new_block);
                 receive_mutex.unlock();
+
+            } else {
+                last_block_mutex.unlock();
             }
-            last_block_mutex.unlock();
         }
 
     }
