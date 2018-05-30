@@ -44,3 +44,22 @@ Si recibimos algún bloque, comenzamos verificando que el hash y el índice del 
 Sólo cuando encontramos uno de los bloques de la cadena en el diccionario  reconstruimos la cadena y ponemos a \texttt{last\_block\_in\_chain} como el primer bloque de la cadena. Si la cadena es inválida (alguno de los bloques tiene información incorrecta) no la agregamos, y si la cadena es válida pero no encontramos ningún bloque de ella en el diccionario tampoco.
 
 La implementación de la función no toma ninguna medida adicional para evitar condiciones de carrera ya que asume que se realizaron las acciones necesarias (lock de \texttt{last\_block\_in\_chain}) antes de ser llamada.
+
+
+\section{Ejercicio 5}
+
+\emph{Desarrolle un análisis del protocolo descripto en este trabajo que responda, al menos, a las siguientes preguntas:}
+
+\emph{¿Puede este protocolo producir dos o más blockchains que nunca converjan?}
+
+Si un nodo $a$ mina un bloque nuevo con índice $i$ y hace el broadcast, pero otro nodo $b$ mina otro bloque con el mismo índice (y también hace el broadcast) antes de recibir el broadcast de $a$, $b$ descartará el bloque enviado por $a$ cuando lo reciba porque tendrá el mismo índice (si $b$ no minó otro bloque ya) y $a$ descartará el bloque de $b$ porque tendrá menor o igual índice (menor si $a$ ya minó otro bloque). Esto podría suceder indefinidamente y, entonces, $a$ y $b$ producirían dos blockchains distintos que no convergen.
+
+Otra forma por la que puede suceder esto es si los mensajes de nuevo bloque minado tardan mucho en llegar. Específicamente, si los mensajes de nuevo bloque minado entre (al menos) dos nodos tardan siempre más de 5 minutos, los nodos siempre descartarán los bloques recibidos y permanecerán en su blockchain, incluso si el índice del bloque recibido es distinto al del último bloque. Lo mismo sucede si por algún motivo los mensajes se transmiten incorrectamente por la red, invalidando la información de los bloques, o si directamente se pierden.
+
+Puede suceder también que un nodo se atrase demasiado en el blockchain por algún motivo y cuando solicite una cadena de bloques no pueda reconstruirla ya que no tiene en su diccionario ningún bloque de la cadena. En este caso el nodo descartará la cadena y seguirá con su blockchain y, si cada vez que otro nodo agrega uno nuevo ocurre lo mismo, producirá un blockchain distinto al resto que no convergerá.
+
+También es posible que se produzcan blockchains que no convergen por una combinación de los esceneraios mencionados.
+
+\emph{¿Cómo afecta la demora o la pérdida en la entrega de paquetes al protocolo?}
+
+Por lo explicado antes, la demora o pérdida en la entrega de paquetes puede aumentar la probabilidad y la cantidad de blockchains distintos en el sistema. Esto resulta, por un lado, en un menor nivel de seguridad o certeza de que un blockchain dado sea ``el correcto"\ y, por el otro, en una mayor cantidad de trabajo desperdiciado dado que más nodos minarán de un blockchain ``incorrecto"\ que en algún punto será (o puede llegar a ser) descartado.
