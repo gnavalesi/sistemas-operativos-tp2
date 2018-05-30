@@ -13,6 +13,14 @@ Luego de hacer todos los pedidos de envío se espera a que los mismos finalicen 
 
 \emph{Modificar el método nodo para que cree un nuevo thread que mine bloques mediante la función \texttt{proof\_of\_work}. Modificar las funciones de manera tal que entre los dos hilos del proceso no se produzcan condiciones de carrera. Además, mientras se envíe la información de un bloque recién creado a los demás, no se deben procesar los mensajes de nuevos bloques minados por otros.}
 
+Para evitar condiciones de carrera usamos un mutex para la variable \texttt{last\_block\_in\_chain}. Hacemos lock de este mutex en \texttt{proof\_of\_work} antes de la copia del último bloque para comenzar a minar y lo liberamos apenas termina. Pedimos también el lock antes de verificar si cambió el último bloque y lo liberamos al salir de la guarda. Si el último bloque no cambió se copiará el nuevo bloque minado a \texttt{last\_block\_in\_chain} y se hará \texttt{broadcast\_block} manteniendo el lock durante todo esto. Esto es para evitar lecturas incorrectas del último bloque por parte del otro thread mientras se está cambiando y también para que no se procesen los mensajes de nuevos bloques minados por otros.
+
+En el otro thread primero esperamos la llegada de un nuevo mensaje. Para ello usamos la función \texttt{MPI\_Probe} que nos permite determinar el información como el tag del mensaje antes de recibir los datos del mismo. Con esto podemos verificar entonces si el mensaje se trata de un nuevo nodo minado por otro (si el tag es \texttt{TAG\_NEW\_BLOCK}) o si es una solicitud de una cadena de bloques (si el tag es \texttt{TAG\_CHAIN\_HASH}) y utilizar un buffer adecuado para recibir el bloque o el hash enviado.
+
+Cuando se trata de un nuevo bloque simplemente llamamos a la función \texttt{validate\_block\_for\_chain} luego de recibir el bloque. Esta, como se explica más adelante, va a solicitar el lock del mutex presentado antes. Luego, como el thread minero mantiene el lock del mismo cuando hace el broadcast, no se procesarán los mensajes de nuevos bloques mientras pasa eso.
+
+Si el mensaje es un pedido de una cadena de bloques, el thread, luego de verificar que tiene el hash pedido en su diccionario, construye la cadena copiándola en un buffer hasta llegar a la longitud dada por \texttt{VALIDATION\_BLOCKS} o llegar al bloque de índice 1 (inclusive). Luego envía la cadena con un \texttt{MPI\_Send} poniendo en el parámetro \texttt{count} la cantidad de bloques de la cadena. Esta cantidad es cero cuando el hash pedido no se encuentra en el diccionario.
+
 
 \section{Ejercicio 3}
 
@@ -22,10 +30,17 @@ La implementación de \texttt{validate\_block\_for\_chain} es una traducción di
 
 Para evitar condiciones de carrera, antes de comparar el nuevo bloque con \texttt{last\_block\_in\_chain} y (posiblemente) hacer una migración, se pide el lock del mutex asociado a esta última variable; se lo libera una vez que se termina de hacer lo mencionado.
 
-Las migraciones de cadena pueden tardar, haciendo que el thread mantenga la posesión del lock por tiempos demorados. Esto es necesario ya que no se quiere que el thread minero tome un bloque incorrecto.
+Las migraciones de cadena pueden tardar, haciendo que el thread mantenga la posesión del lock por tiempos prolongados. Esto es necesario ya que no se quiere que el thread minero tome un bloque incorrecto.
 
 
 \section{Ejercicio 4}
 
 \emph{Completar la función \texttt{verificar\_y\_migrar\_cadena} para que respete el protocolo descripto en la sección correspondiente.}
 
+En la función \texttt{verificar\_y\_migrar\_cadena} primero le enviamos un mensaje al nodo que agregó el nuevo bloque solicitándole una cadena de bloques y luego esperamos a que la envíe.
+
+Si recibimos algún bloque, comenzamos verificando que el hash y el índice del primero coincidan con el del bloque solicitado y que el hash sea correcto. Si esto se confirma, procedemos a recorrer la cadena verificando que los índices y los hashes de cada bloque sean correctos con respecto a la información del bloque anterior y, a su vez, vamos viendo si los bloques están o no en el diccionario de bloques. Si algún índice o hash es incorrecto o algún bloque es encontrado en el diccionario, dejamos de recorrer la cadena. En el primer caso la cadena es inválida y no la agregamos; en el segundo podemos reconstruir la cadena a partir del bloque encontrado.
+
+Sólo cuando encontramos uno de los bloques de la cadena en el diccionario  reconstruimos la cadena y ponemos a \texttt{last\_block\_in\_chain} como el primer bloque de la cadena. Si la cadena es inválida (alguno de los bloques tiene información incorrecta) no la agregamos, y si la cadena es válida pero no encontramos ningún bloque de ella en el diccionario tampoco.
+
+La implementación de la función no toma ninguna medida adicional para evitar condiciones de carrera ya que asume que se realizaron las acciones necesarias (lock de \texttt{last\_block\_in\_chain}) antes de ser llamada.
