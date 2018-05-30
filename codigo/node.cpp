@@ -51,52 +51,60 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
     int chain_count;
     MPI_Get_count(&message_status, *MPI_BLOCK, &chain_count);
 
-    if (string(blockchain[0].block_hash) == string(rBlock->block_hash) &&
-        blockchain[0].index == rBlock->index) {
+    if (chain_count > 0) {
 
-        string hash;
-        block_to_hash(&blockchain[0], hash);
+        if (string(blockchain[0].block_hash) == string(rBlock->block_hash) &&
+            blockchain[0].index == rBlock->index) {
 
-        if (string(blockchain[0].block_hash) == hash) {
-            printf("[%d] Primer bloque enviado por %d es valido\n", mpi_rank, status->MPI_SOURCE);
+            string hash;
+            block_to_hash(&blockchain[0], hash);
 
-            i = 0; valid = true;
-            while (++i < chain_count) {
-                if (blockchain[i-1].index != blockchain[i].index + 1 ||
-                    string(blockchain[i-1].previous_block_hash) != string(blockchain[i].block_hash)) {
-                    valid = false;
-                    break;
+            if (string(blockchain[0].block_hash) == hash) {
+                printf("[%d] Primer bloque enviado por %d es valido\n", mpi_rank, status->MPI_SOURCE);
+
+                i = 0; valid = true;
+                while (++i < chain_count) {
+                    if (blockchain[i-1].index != blockchain[i].index + 1 ||
+                        string(blockchain[i-1].previous_block_hash) != string(blockchain[i].block_hash)) {
+                        valid = false;
+                        break;
+                    }
+
+                    if (node_blocks.count(string(blockchain[i].block_hash)) == 1) break;
                 }
 
-                if (node_blocks.count(string(blockchain[i].block_hash)) == 1) break;
-            }
-
-            if (valid) {
-                printf("[%d] La cadena de bloques enviada por %d es valida\n", mpi_rank, status->MPI_SOURCE);
-                found = i < chain_count;
+                if (valid) {
+                    printf("[%d] La cadena de bloques enviada por %d es valida\n", mpi_rank, status->MPI_SOURCE);
+                    found = i < chain_count;
+                }
             }
         }
+
+
+        if (found) {
+            for (int j = 1; j < i; ++j) node_blocks[string(blockchain[i].block_hash)] = blockchain[i];
+            *last_block_in_chain = blockchain[0];
+
+            printf("[%d] Agregué la cadena de bloques enviada por %d\n", mpi_rank, status->MPI_SOURCE);
+
+            delete[] blockchain;
+            return true;
+        }
+
+        if (!valid)
+            printf("[%d] La cadena de bloques enviada por %d es invalida\n", mpi_rank, status->MPI_SOURCE);
+        else if (!found)
+            printf("[%d] No se encontró ningún bloque de la cadena enviada por %d en el diccionario\n",
+                    mpi_rank, status->MPI_SOURCE);
+        else
+            cerr << "Error: verificar_y_migrar_cadena" << endl;
+
+        printf("[%d] No se puede migrar a la cadena recibida por %d. La descarto por seguridad\n",
+                mpi_rank, status->MPI_SOURCE);
+
+    } else {
+        printf("[%d] No se recibió ningún bloque de %d\n", mpi_rank, status->MPI_SOURCE);
     }
-
-
-    if (found) {
-        for (int j = 1; j < i; ++j) node_blocks[string(blockchain[i].block_hash)] = blockchain[i];
-        *last_block_in_chain = blockchain[0];
-
-        printf("[%d] Agregué la cadena de bloques enviada por %d\n", mpi_rank, status->MPI_SOURCE);
-
-        delete[] blockchain;
-        return true;
-    }
-
-    if (!valid)
-        printf("[%d] La cadena de bloques enviada por %d es invalida\n", mpi_rank, status->MPI_SOURCE);
-    else if (!found)
-        printf("[%d] No se encontró ningún bloque de la cadena enviada por %d en el diccionario\n", mpi_rank, status->MPI_SOURCE);
-    else
-        cerr << "Error: verificar_y_migrar_cadena" << endl;
-
-    printf("[%d] No se puede migrar a la cadena recibida por %d. La descarto por seguridad\n", mpi_rank, status->MPI_SOURCE);
 
     delete[] blockchain;
     return false;
