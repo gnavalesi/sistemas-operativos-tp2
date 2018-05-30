@@ -7,3 +7,25 @@ Para que se envíen los mensajes en un orden distinto cada nodo hace el envío r
 Los mensajes se envían de forma no bloqueante con \texttt{MPI\_Isend} para que la lectura del bloque se pueda hacer concurrentemente. Si se usara \texttt{MPI\_Send}, cada pedido de envío comenzaría recién una vez que el llamado anterior haya terminado de leer el bloque, forzando una lectura secuencial.
 
 Luego de hacer todos los pedidos de envío se espera a que los mismos finalicen con un llamado a \texttt{MPI\_Waitall}.
+
+
+\section{Ejercicio 2}
+
+\emph{Modificar el método nodo para que cree un nuevo thread que mine bloques mediante la función \texttt{proof\_of\_work}. Modificar las funciones de manera tal que entre los dos hilos del proceso no se produzcan condiciones de carrera. Además, mientras se envíe la información de un bloque recién creado a los demás, no se deben procesar los mensajes de nuevos bloques minados por otros.}
+
+
+\section{Ejercicio 3}
+
+\emph{Completar la función \texttt{validate\_block\_for\_chain} para que respete las reglas de consenso descriptas y no tenga condiciones de carrera con el thread que mina nuevos bloques.}
+
+La implementación de \texttt{validate\_block\_for\_chain} es una traducción directa de los puntos mencionados en la sección \emph{Consenso} del enunciado.
+
+Para evitar condiciones de carrera, antes de comparar el nuevo bloque con \texttt{last\_block\_in\_chain} y (posiblemente) hacer una migración, se pide el lock del mutex asociado a esta última variable; se lo libera una vez que se termina de hacer lo mencionado.
+
+Las migraciones de cadena pueden tardar, haciendo que el thread mantenga la posesión del lock por tiempos demorados. Esto es necesario ya que no se quiere que el thread minero tome un bloque incorrecto.
+
+
+\section{Ejercicio 4}
+
+\emph{Completar la función \texttt{verificar\_y\_migrar\_cadena} para que respete el protocolo descripto en la sección correspondiente.}
+
