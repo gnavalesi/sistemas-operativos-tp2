@@ -96,8 +96,7 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
     else
         cerr << "Error: verificar_y_migrar_cadena" << endl;
 
-    printf("[%d] Terminado. No se puede migrar cadena.\n", mpi_rank);
-    finished_mining.store(true);
+    printf("[%d] No se puede migrar a la cadena recibida por %d. La descarto por seguridad\n", mpi_rank, status->MPI_SOURCE);
 
     delete[] blockchain;
     return false;
