@@ -14,7 +14,7 @@
 int total_nodes, mpi_rank;
 Block *last_block_in_chain;
 map<string, Block> node_blocks;
-mutex receive_mutex, last_block_mutex;
+mutex last_block_mutex;
 atomic<bool> finished_mining;
 
 void run(int result, const string &message) {
@@ -79,7 +79,6 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
                 }
             }
         }
-
 
         if (found) {
             for (int j = 1; j < i; ++j) node_blocks[string(blockchain[i].block_hash)] = blockchain[i];
@@ -241,18 +240,13 @@ void *proof_of_work(void *ptr) {
                 *last_block_in_chain = block;
                 strcpy(last_block_in_chain->block_hash, hash_hex_str.c_str());
                 Block *new_block = &(node_blocks[hash_hex_str] = *last_block_in_chain);
-
-                last_block_mutex.unlock();
                 printf("[%d] Agregué un bloque producido con index %d \n", mpi_rank, last_block_in_chain->index);
 
                 //FIXME: Mientras comunico, no responder mensajes de nuevos nodos
-                receive_mutex.lock();
                 broadcast_block(new_block);
-                receive_mutex.unlock();
-
-            } else {
-                last_block_mutex.unlock();
             }
+
+            last_block_mutex.unlock();
         }
 
     }
@@ -313,9 +307,7 @@ int node() {
             run(MPI_Recv(new_block, 1, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_NEW_BLOCK,
                 MPI_COMM_WORLD, &message_status), "Error: unable to receive TAG_NEW_BLOCK message");
 
-            receive_mutex.lock();
             validate_block_for_chain(new_block, &message_status);
-            receive_mutex.unlock();
 
         } else if (message_status.MPI_TAG == TAG_CHAIN_HASH) {
             //FIXME: Si es un mensaje de pedido de cadena,
