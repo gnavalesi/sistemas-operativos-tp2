@@ -203,7 +203,7 @@ void *proof_of_work(void *ptr) {
     string hash_hex_str;
     Block block;
     unsigned int mined_blocks = 0;
-    while (mined_blocks < BLOCKS_TO_MINE && !finished_mining) {
+    while (mined_blocks < BLOCKS_TO_MINE && !finished_mining.load()) {
 
         last_block_mutex.lock();
         block = *last_block_in_chain;
