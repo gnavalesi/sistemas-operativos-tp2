@@ -316,15 +316,16 @@ int node() {
             run(MPI_Recv(block_hash, HASH_SIZE, MPI_CHAR, message_status.MPI_SOURCE, TAG_CHAIN_HASH,
                 MPI_COMM_WORLD, &message_status), "Error: unable to receive TAG_CHAIN_HASH message");
 
-            string hash = string(block_hash);
+            auto it = node_blocks.find(string(block_hash));
             i = 0;
-            do {
-                auto it = node_blocks.find(hash);
-                if (it == node_blocks.end()) break;
-                blocks_to_send[i] = it->second;
-                hash = string(it->second.previous_block_hash);
+
+            if (it != node_blocks.end()) {
+                blocks_to_send[0] = it->second;
+
+                while (blocks_to_send[i].index > 0 && ++i < VALIDATION_BLOCKS) {
+                    blocks_to_send[i] = node_blocks[string(blocks_to_send[i-1].previous_block_hash)];
+                }
             }
-            while (blocks_to_send[i].index > 1 && ++i < VALIDATION_BLOCKS);
 
             if (i == 0) {
                 printf("[%d] No tengo el bloque pedido por %d con hash %s\n",
