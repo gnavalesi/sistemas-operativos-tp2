@@ -63,3 +63,11 @@ También es posible que se produzcan blockchains que no convergen por una combin
 \emph{¿Cómo afecta la demora o la pérdida en la entrega de paquetes al protocolo?}
 
 Por lo explicado antes, la demora o pérdida en la entrega de paquetes puede aumentar la probabilidad y la cantidad de blockchains distintos en el sistema. Esto resulta, por un lado, en un menor nivel de seguridad o certeza de que un blockchain dado sea ``el correcto"\ y, por el otro, en una mayor cantidad de trabajo desperdiciado dado que más nodos minarán de un blockchain ``incorrecto"\ que en algún punto será (o puede llegar a ser) descartado.
+
+\emph{¿Cómo afecta el aumento o la disminución de la dificultad del Proof-of-Work a los conflictos entre nodos y a la convergencia?}
+
+Cuando disminuye la dificultad del Proof-of-Work los bloques se minan más rápido. Esto hace que la cantidad de conflictos sea mayor ya que los nodos podrán minar una mayor cantidad de bloques en el tiempo que tarda en llegar un bloque nuevo y, entonces, será más probable que este sea descartado. Por esta razón, también, se producirán más blockchains distintos que tardarán más (en términos de cantidad de bloques) en converger porque para hacerlo el nuevo bloque de un nodo deberá llegar a los otros lo suficientemente rápido (antes de que minen demasiados bloques) para que estos abandonen su blockchain.
+
+Si la dificultad aumenta, en cambio, los tiempos de minado serán mayores y será menos probable que un nodo se adelante mucho en el blockchain antes de que llegue un nuevo bloque de parte de otro nodo. Por ende, la cantidad de conflictos disminuirá y la posibilidad de que aparezcan blockchains distintos será menor, por lo que será más ``fuerte"\ la convergencia.
+
+Por lo mencionado antes, también, cuando la dificultad es menor los conflictos se darán con índices más alejados, porque se habrá minado una mayor cantidad de bloques entre que se hizo el broadcast de un bloque nuevo hasta que fue recibido. Pero cuando la dificultad aumenta, los conflictos serán entre índices más cercanos debido a que se podrán minar menos bloques en dicho período de tiempo.
