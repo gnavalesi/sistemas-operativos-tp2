@@ -15,7 +15,7 @@ Luego de hacer todos los pedidos de envío se espera a que los mismos finalicen 
 
 Para evitar condiciones de carrera usamos un mutex para la variable \texttt{last\_block\_in\_chain}. Hacemos lock de este mutex en \texttt{proof\_of\_work} antes de la copia del último bloque para comenzar a minar y lo liberamos apenas termina. Pedimos también el lock antes de verificar si cambió el último bloque y lo liberamos al salir de la guarda. Si el último bloque no cambió se copiará el nuevo bloque minado a \texttt{last\_block\_in\_chain} y se hará \texttt{broadcast\_block} manteniendo el lock durante todo esto. Esto es para evitar lecturas incorrectas del último bloque por parte del otro thread mientras se está cambiando y también para que no se procesen los mensajes de nuevos bloques minados por otros.
 
-En el otro thread primero esperamos la llegada de un nuevo mensaje. Para ello usamos la función \texttt{MPI\_Probe} que nos permite determinar el información como el tag del mensaje antes de recibir los datos del mismo. Con esto podemos verificar entonces si el mensaje se trata de un nuevo nodo minado por otro (si el tag es \texttt{TAG\_NEW\_BLOCK}) o si es una solicitud de una cadena de bloques (si el tag es \texttt{TAG\_CHAIN\_HASH}) y utilizar un buffer adecuado para recibir el bloque o el hash enviado.
+En el otro thread primero esperamos la llegada de un nuevo mensaje. Para ello usamos la función \texttt{MPI\_Probe} que nos permite determinar información como el tag del mensaje antes de recibir los datos del mismo. Con esto podemos verificar entonces si el mensaje se trata de un nuevo nodo minado por otro (si el tag es \texttt{TAG\_NEW\_BLOCK}) o si es una solicitud de una cadena de bloques (si el tag es \texttt{TAG\_CHAIN\_HASH}) y utilizar un buffer adecuado para recibir el bloque o el hash enviado.
 
 Cuando se trata de un nuevo bloque simplemente llamamos a la función \texttt{validate\_block\_for\_chain} luego de recibir el bloque. Esta, como se explica más adelante, va a solicitar el lock del mutex presentado antes. Luego, como el thread minero mantiene el lock del mismo cuando hace el broadcast, no se procesarán los mensajes de nuevos bloques mientras pasa eso.
 
@@ -58,7 +58,7 @@ Otra forma por la que puede suceder esto es si los mensajes de nuevo bloque mina
 
 Puede suceder también que un nodo se atrase demasiado en el blockchain por algún motivo y cuando solicite una cadena de bloques no pueda reconstruirla ya que no tiene en su diccionario ningún bloque de la cadena. En este caso el nodo descartará la cadena y seguirá con su blockchain y, si cada vez que otro nodo agrega uno nuevo ocurre lo mismo, producirá un blockchain distinto al resto que no convergerá.
 
-También es posible que se produzcan blockchains que no convergen por una combinación de los esceneraios mencionados.
+También es posible que se produzcan blockchains que no convergen por una combinación de los escenarios mencionados.
 
 \emph{¿Cómo afecta la demora o la pérdida en la entrega de paquetes al protocolo?}
 
