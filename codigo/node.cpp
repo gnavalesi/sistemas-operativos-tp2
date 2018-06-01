@@ -30,19 +30,19 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
     Block *blockchain = new Block[VALIDATION_BLOCKS];
     MPI_Status message_status{};
 
-    //FIXME: Enviar mensaje TAG_CHAIN_HASH
+    //DONE: Enviar mensaje TAG_CHAIN_HASH
     printf("[%d] Pidiendo cadena a %d empezando por el hash %s\n", mpi_rank, status->MPI_SOURCE, rBlock->block_hash);
     run(MPI_Send(rBlock->block_hash, HASH_SIZE, MPI_CHAR, status->MPI_SOURCE, TAG_CHAIN_HASH, MPI_COMM_WORLD),
         "Error: unable to send TAG_CHAIN_HASH message");
 
-    //FIXME: Recibir mensaje TAG_CHAIN_RESPONSE
+    //DONE: Recibir mensaje TAG_CHAIN_RESPONSE
     printf("[%d] Recibiendo bloques de %d\n", mpi_rank, status->MPI_SOURCE);
     run(MPI_Recv(blockchain, VALIDATION_BLOCKS, *MPI_BLOCK, status->MPI_SOURCE, TAG_CHAIN_RESPONSE, MPI_COMM_WORLD,
                  &message_status),
         "Error: unable to receive TAG_CHAIN_RESPONSE message");
     printf("[%d] Bloques recibidos de %d\n", mpi_rank, status->MPI_SOURCE);
 
-    //FIXME: Verificar que los bloques recibidos
+    //DONE: Verificar que los bloques recibidos
     //sean válidos y se puedan acoplar a la cadena
 
     bool valid = false, found = false;
@@ -124,7 +124,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
         // Lockeo last_block_in_chain porque lo voy a consultar y posiblemente modificar
         last_block_mutex.lock();
 
-        //FIXME: Si el índice del bloque recibido es 1
+        //DONE: Si el índice del bloque recibido es 1
         //y mí último bloque actual tiene índice 0,
         //entonces lo agrego como nuevo último.
         if (rBlock->index == 1 && last_block_in_chain->index == 0) {
@@ -134,7 +134,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
                    rBlock->index, status->MPI_SOURCE);
         }
 
-        //FIXME: Si el índice del bloque recibido es
+        //DONE: Si el índice del bloque recibido es
         //el siguiente a mí último bloque actual...
         else if (last_block_in_chain->index + 1 == rBlock->index) {
             //...y el bloque anterior apuntado por el recibido es mí último actual,
@@ -154,7 +154,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
             }
         }
 
-        //FIXME: Si el índice del bloque recibido es igua al índice de mi último bloque actual,
+        //DONE: Si el índice del bloque recibido es igua al índice de mi último bloque actual,
         //entonces hay dos posibles forks de la blockchain pero mantengo la mía
         else if (rBlock->index == last_block_in_chain->index) {
             ret = false;
@@ -162,7 +162,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
                    status->MPI_SOURCE);
         }
 
-        //FIXME: Si el índice del bloque recibido es anterior al índice de mi último bloque actual,
+        //DONE: Si el índice del bloque recibido es anterior al índice de mi último bloque actual,
         //entonces lo descarto porque asumo que mi cadena es la que está quedando preservada.
         else if (rBlock->index < last_block_in_chain->index) {
             ret = false;
@@ -170,7 +170,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
                    last_block_in_chain->index, status->MPI_SOURCE);
         }
 
-        //FIXME: Si el índice del bloque recibido está más de una posición adelantada a mi último bloque actual,
+        //DONE: Si el índice del bloque recibido está más de una posición adelantada a mi último bloque actual,
         //entonces me conviene abandonar mi blockchain actual
         else if (rBlock->index > last_block_in_chain->index + 1) {
             printf("[%d] Perdí la carrera por varios contra %d \n", mpi_rank, status->MPI_SOURCE);
@@ -190,7 +190,7 @@ bool validate_block_for_chain(const Block *rBlock, const MPI_Status *status) {
 //Envia el bloque minado a todos los nodos
 void broadcast_block(const Block *block) {
     //No enviar a mí mismo
-    //FIXME: Completar
+    //DONE: Completar
 
     printf("[%d] Enviando nuevo bloque minado con índice %d\n", mpi_rank, block->index);
 
@@ -207,7 +207,7 @@ void broadcast_block(const Block *block) {
 }
 
 //Proof of work
-//FIXME: Advertencia: puede tener condiciones de carrera
+//DONE: Advertencia: puede tener condiciones de carrera
 void *proof_of_work(void *ptr) {
     string hash_hex_str;
     Block block;
@@ -244,7 +244,7 @@ void *proof_of_work(void *ptr) {
                 Block *new_block = &(node_blocks[hash_hex_str] = *last_block_in_chain);
                 printf("[%d] Agregué un bloque producido con index %d \n", mpi_rank, last_block_in_chain->index);
 
-                //FIXME: Mientras comunico, no responder mensajes de nuevos nodos
+                //DONE: Mientras comunico, no responder mensajes de nuevos nodos
                 broadcast_block(new_block);
 
                 if (last_block_in_chain->index == MAX_BLOCKS) MPI_Abort(MPI_COMM_WORLD, MPI_SUCCESS);
@@ -288,20 +288,20 @@ int node() {
     last_block_in_chain->created_at = static_cast<unsigned long int> (time(NULL));
     memset(last_block_in_chain->previous_block_hash, 0, HASH_SIZE);
 
-    //FIXME: Crear thread para minar
+    //DONE: Crear thread para minar
     if (pthread_create(&miner_thread, nullptr, proof_of_work, nullptr)) {
         cerr << "Error: unable to create thread" << endl;
         exit(-1);
     }
 
     while (true) {
-        //FIXME: Recibir mensajes de otros nodos
+        //DONE: Recibir mensajes de otros nodos
 
         run(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &message_status),
             "Error: unable to probe message");
 
         if (message_status.MPI_TAG == TAG_NEW_BLOCK) {
-            //FIXME: Si es un mensaje de nuevo bloque, llamar a la función
+            //DONE: Si es un mensaje de nuevo bloque, llamar a la función
             // validate_block_for_chain con el bloque recibido y el estado de MPI
 
             run(MPI_Recv(new_block, 1, *MPI_BLOCK, message_status.MPI_SOURCE, TAG_NEW_BLOCK,
@@ -310,7 +310,7 @@ int node() {
             validate_block_for_chain(new_block, &message_status);
 
         } else if (message_status.MPI_TAG == TAG_CHAIN_HASH) {
-            //FIXME: Si es un mensaje de pedido de cadena,
+            //DONE: Si es un mensaje de pedido de cadena,
             //responderlo enviando los bloques correspondientes
 
             run(MPI_Recv(block_hash, HASH_SIZE, MPI_CHAR, message_status.MPI_SOURCE, TAG_CHAIN_HASH,
