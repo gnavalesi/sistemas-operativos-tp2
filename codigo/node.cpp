@@ -65,8 +65,11 @@ bool verificar_y_migrar_cadena(const Block *rBlock, const MPI_Status *status) {
                 while (++i < chain_count) {
                     if (blockchain[i-1].index != blockchain[i].index + 1 ||
                         string(blockchain[i-1].previous_block_hash) != string(blockchain[i].block_hash)) {
-                        valid = false;
-                        break;
+                        block_to_hash(&blockchain[i], hash);
+                        if (hash != blockchain[i].block_hash) {
+                            valid = false;
+                            break;
+                        }
                     }
 
                     if (node_blocks.count(string(blockchain[i].block_hash)) == 1) break;
