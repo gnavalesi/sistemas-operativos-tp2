@@ -15,7 +15,6 @@ int total_nodes, mpi_rank;
 Block *last_block_in_chain;
 map<string, Block> node_blocks;
 mutex last_block_mutex;
-atomic<bool> finished_mining;
 
 void run(int result, const string &message) {
     if (result != MPI_SUCCESS) {
@@ -210,7 +209,7 @@ void *proof_of_work(void *ptr) {
     string hash_hex_str;
     Block block;
     unsigned int mined_blocks = 0;
-    while (mined_blocks < BLOCKS_TO_MINE && !finished_mining.load()) {
+    while (true) {
 
         last_block_mutex.lock();
         block = *last_block_in_chain;
@@ -244,14 +243,14 @@ void *proof_of_work(void *ptr) {
 
                 //FIXME: Mientras comunico, no responder mensajes de nuevos nodos
                 broadcast_block(new_block);
+
+                if (last_block_in_chain->index == MAX_BLOCKS) MPI_Abort(MPI_COMM_WORLD, MPI_SUCCESS);
             }
 
             last_block_mutex.unlock();
         }
 
     }
-
-    finished_mining.store(true);
 
     printf("[%d] Termine de minar \n", mpi_rank);
 
@@ -286,15 +285,13 @@ int node() {
     last_block_in_chain->created_at = static_cast<unsigned long int> (time(NULL));
     memset(last_block_in_chain->previous_block_hash, 0, HASH_SIZE);
 
-    finished_mining.store(false);
-
     //FIXME: Crear thread para minar
     if (pthread_create(&miner_thread, nullptr, proof_of_work, nullptr)) {
         cerr << "Error: unable to create thread" << endl;
         exit(-1);
     }
 
-    while (!finished_mining.load()) {
+    while (true) {
         //FIXME: Recibir mensajes de otros nodos
 
         run(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &message_status),
