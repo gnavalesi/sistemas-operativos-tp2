@@ -32,6 +32,8 @@ Para evitar condiciones de carrera, antes de comparar el nuevo bloque con \textt
 
 Las migraciones de cadena pueden tardar, haciendo que el thread mantenga la posesión del lock por tiempos prolongados. Esto es necesario ya que no se quiere que el thread minero tome un bloque incorrecto.
 
+Dado que usamos un solo mutex para los únicos dos threads que hay y estos threads piden el lock a lo sumo una vez en cada iteración de su ejecución (y siempre que lo piden lo liberan en algún punto \emph{en el código}), si todos los threads liberan el lock eventualmente entonces todos podrán obtener el lock en algún momento (asumiendo fairness). Es decir, las ejecuciones de los nodos cumplen con la propiedad de \emph{deadlock-freedom}. No podemos afirmar que cumplen con la propiedad de \emph{wait-freedom} ya que, teóricamente, nada nos garantiza que el thread minero encuentre un hash válido ni que el thread que procesa mensajes no se quede bloqueado indefinidamente al intercambiar mensajes en la migración.
+
 
 \section{Ejercicio 4}
 
